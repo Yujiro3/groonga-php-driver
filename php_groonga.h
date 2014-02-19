@@ -59,7 +59,6 @@ PHP_MINFO_FUNCTION(groonga);
 typedef struct {
     zend_object std;
     grn_ctx *ctx;
-    grn_rc rc;
     int connected;
 } groonga_t;
 
@@ -72,6 +71,8 @@ PHP_METHOD(Groonga, connect);
 PHP_METHOD(Groonga, close);
 PHP_METHOD(Groonga, send);
 PHP_METHOD(Groonga, recv);
+
+PHP_METHOD(Groonga, query);
 
 
 /* 

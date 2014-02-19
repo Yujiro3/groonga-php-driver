@@ -63,6 +63,8 @@ const zend_function_entry groonga_functions[] = {
     PHP_ME(Groonga, send, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(Groonga, recv, NULL, ZEND_ACC_PUBLIC)
 
+    PHP_ME(Groonga, query, NULL, ZEND_ACC_PUBLIC)
+
     PHP_FE_END    /* Must be the last line in groonga_functions[] */
 };
 /* }}} */
@@ -256,7 +258,7 @@ PHP_METHOD(Groonga, __destruct)
 
     /* groongaとの接続を切断 */
     if (object->connected) {
-        object->rc = grn_ctx_close(object->ctx);
+        grn_ctx_close(object->ctx);
     }
 
     /* grn_ctx構造体を開放 */
@@ -285,7 +287,7 @@ PHP_METHOD(Groonga, connect)
 
     object = (groonga_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
 
-    if ((object->rc = grn_ctx_connect((grn_ctx *)object->ctx, host, port, flags)) != GRN_SUCCESS) {
+    if (grn_ctx_connect((grn_ctx *)object->ctx, host, port, flags) != GRN_SUCCESS) {
         zend_throw_exception(NULL, "Groonga server went away", 0 TSRMLS_CC);
         RETURN_FALSE;
     }
@@ -309,7 +311,7 @@ PHP_METHOD(Groonga, close)
 
     /* groongaとの接続を切断 */
     if (object->connected) {
-        if ((object->rc = grn_ctx_close(object->ctx)) != GRN_SUCCESS) {
+        if (grn_ctx_close(object->ctx) != GRN_SUCCESS) {
             RETURN_FALSE;
         }
     }
@@ -352,8 +354,8 @@ PHP_METHOD(Groonga, recv)
     groonga_t *object;
     zval *ret = NULL;
 
-    char *str;
-    int flags;
+    char *str = NULL;
+    int flags = 0;
     unsigned int str_len, qid;
 
     MAKE_STD_ZVAL(ret);
@@ -373,6 +375,39 @@ PHP_METHOD(Groonga, recv)
     add_next_index_stringl(ret, str, str_len, 1);
 
     add_index_zval(return_value, qid, ret);
+}
+/* }}} */
+
+
+/* {{{ proto long Groonga::query(string query[, long flags])
+ */
+PHP_METHOD(Groonga, query)
+{
+    groonga_t *object;
+    char *cmd = NULL, *res = NULL;
+    unsigned int length;
+    long flags = 0;
+
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &cmd, &length, &flags) == FAILURE) {
+        RETURN_FALSE;
+    }
+
+    object = (groonga_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
+
+    grn_ctx_send(object->ctx, cmd, length, flags);
+    if (GRN_SUCCESS == object->ctx->rc) {
+        grn_ctx_recv(object->ctx, &res, &length, &flags);
+    }
+
+    if (GRN_SUCCESS != object->ctx->rc) {
+        RETURN_FALSE;
+    }
+
+    if (NULL == res) {
+        RETURN_FALSE;
+    }
+
+    RETURN_STRINGL(res, length, 1);
 }
 /* }}} */
 
