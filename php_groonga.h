@@ -60,6 +60,8 @@ typedef struct {
     zend_object std;
     grn_ctx *ctx;
     int connected;
+    long flags;
+    unsigned int qid;
 } groonga_t;
 
 /**
@@ -72,8 +74,13 @@ PHP_METHOD(Groonga, close);
 PHP_METHOD(Groonga, send);
 PHP_METHOD(Groonga, recv);
 
+PHP_METHOD(Groonga, getFlags);
+PHP_METHOD(Groonga, getQueryID);
+PHP_METHOD(Groonga, getErrorMessage);
 PHP_METHOD(Groonga, query);
 
+#define REGISTER_CLASS_CONST_LONG(pce, const_name, value) zend_declare_class_constant_long(pce, const_name, sizeof(const_name)-1, (long)value TSRMLS_CC);
+#define REGISTER_CLASS_CONST_STRING(pce, const_name, value) zend_declare_class_constant_stringl(pce, const_name, sizeof(const_name)-1, (long)value TSRMLS_CC);
 
 /* 
     Declare any global variables you may need between the BEGIN

@@ -36,6 +36,8 @@
 #include "php.h"
 #include "php_ini.h"
 #include "ext/standard/info.h"
+#include "zend_exceptions.h"
+#include "zend_API.h"
 #include "php_groonga.h"
 
 /* If you declare any globals in php_groonga.h uncomment this:
@@ -56,14 +58,17 @@ zend_class_entry *groonga_ce;
  * Every user visible function must have an entry in groonga_functions[].
  */
 const zend_function_entry groonga_functions[] = {
-    PHP_ME(Groonga, __construct, NULL, ZEND_ACC_CTOR | ZEND_ACC_PUBLIC)
-    PHP_ME(Groonga, __destruct, NULL, ZEND_ACC_DTOR | ZEND_ACC_PUBLIC)
-    PHP_ME(Groonga, connect, NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Groonga, close, NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Groonga, send, NULL, ZEND_ACC_PUBLIC)
-    PHP_ME(Groonga, recv, NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Groonga, __construct,     NULL, ZEND_ACC_CTOR | ZEND_ACC_PUBLIC)
+    PHP_ME(Groonga, __destruct,      NULL, ZEND_ACC_DTOR | ZEND_ACC_PUBLIC)
+    PHP_ME(Groonga, connect,         NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Groonga, close,           NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Groonga, send,            NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Groonga, recv,            NULL, ZEND_ACC_PUBLIC)
 
-    PHP_ME(Groonga, query, NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Groonga, getFlags,        NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Groonga, getQueryID,      NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Groonga, getErrorMessage, NULL, ZEND_ACC_PUBLIC)
+    PHP_ME(Groonga, query,           NULL, ZEND_ACC_PUBLIC)
 
     PHP_FE_END    /* Must be the last line in groonga_functions[] */
 };
@@ -147,6 +152,7 @@ zend_object_value php_groonga_new(zend_class_entry *ce TSRMLS_DC)
 
     object->ctx = emalloc(sizeof(*object->ctx));
     object->connected = 0;
+    object->flags = 0;
 
     retval.handle = zend_objects_store_put(
         object, 
@@ -169,6 +175,27 @@ PHP_MINIT_FUNCTION(groonga)
     INIT_CLASS_ENTRY(ce, "Groonga", groonga_functions);
     groonga_ce = zend_register_internal_class(&ce TSRMLS_CC);
     groonga_ce->create_object = php_groonga_new;
+
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_CTX_USE_QL",     (long)GRN_CTX_USE_QL);      // (0x03)
+
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_CTX_BATCH_MODE", (long)GRN_CTX_BATCH_MODE);  // (0x04)
+
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_ENC_DEFAULT",    (long)GRN_ENC_DEFAULT);     // 0
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_ENC_NONE",       (long)GRN_ENC_NONE);        // 1
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_ENC_EUC_JP",     (long)GRN_ENC_EUC_JP);      // 2
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_ENC_UTF8",       (long)GRN_ENC_UTF8);        // 3
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_ENC_SJIS",       (long)GRN_ENC_SJIS);        // 4
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_ENC_LATIN1",     (long)GRN_ENC_LATIN1);      // 5
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_ENC_KOI8R",      (long)GRN_ENC_KOI8R);       // 6
+
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_CTX_MORE",       (long)GRN_CTX_MORE);        // (0x01<<0)
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_CTX_TAIL",       (long)GRN_CTX_TAIL);        // (0x01<<1)
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_CTX_HEAD",       (long)GRN_CTX_HEAD);        // (0x01<<2)
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_CTX_QUIET",      (long)GRN_CTX_QUIET);       // (0x01<<3)
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_CTX_QUIT",       (long)GRN_CTX_QUIT);        // (0x01<<4)
+
+    REGISTER_CLASS_CONST_LONG(groonga_ce, "GRN_CTX_FIN",        (long)GRN_CTX_FIN);         // (0xff)
+
 
     return SUCCESS;
 }
@@ -226,7 +253,7 @@ PHP_METHOD(Groonga, __construct)
     }
 
     /* groongaライブラリを初期化 */
-    if (grn_init()) {
+    if (GRN_SUCCESS != grn_init()) {
         RETURN_FALSE;
     }
     groonga_initialized = 1;
@@ -236,7 +263,7 @@ PHP_METHOD(Groonga, __construct)
 
     /* grn_ctx構造体を初期化 */
     if (grn_ctx_init(object->ctx, 0)) {
-        zend_throw_exception(NULL, "grn_ctx_init() failed!", 0 TSRMLS_CC);
+        zend_throw_exception(NULL, "Unable to  finish context.", 0 TSRMLS_CC);
         RETURN_FALSE;
     }
 }
@@ -263,7 +290,7 @@ PHP_METHOD(Groonga, __destruct)
 
     /* grn_ctx構造体を開放 */
     if (grn_ctx_fin(object->ctx)) {
-        zend_throw_exception(NULL, "grn_ctx_fin() failed!", 0 TSRMLS_CC);
+        zend_throw_exception(NULL, "Unable to  finish context.", 0 TSRMLS_CC);
         RETURN_FALSE;
     }
     object->ctx = NULL;
@@ -276,6 +303,7 @@ PHP_METHOD(Groonga, __destruct)
 PHP_METHOD(Groonga, connect)
 {
     groonga_t *object;
+    char errmsg[64];
     char  *host = "localhost";
     int host_len = 0;
     long port = 10041;
@@ -288,7 +316,8 @@ PHP_METHOD(Groonga, connect)
     object = (groonga_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
 
     if (grn_ctx_connect((grn_ctx *)object->ctx, host, port, flags) != GRN_SUCCESS) {
-        zend_throw_exception(NULL, "Groonga server went away", 0 TSRMLS_CC);
+        sprintf(errmsg, "Unable to connect to Groonga server.[%s:%d]", host, port);
+        zend_throw_exception(NULL, errmsg, 0 TSRMLS_CC);
         RETURN_FALSE;
     }
     
@@ -321,7 +350,7 @@ PHP_METHOD(Groonga, close)
 /* }}} */
 
 
-/* {{{ proto long Groonga::send(string query[, long flags])
+/* {{{ proto boolean Groonga::send(string query[, long flags])
  */
 PHP_METHOD(Groonga, send)
 {
@@ -337,49 +366,80 @@ PHP_METHOD(Groonga, send)
     object = (groonga_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
 
     /* groongaへコマンド送信 */
-    qid = grn_ctx_send(object->ctx, query, query_len, flags);
+    object->qid = grn_ctx_send(object->ctx, query, query_len, flags);
     if (object->ctx->rc != GRN_SUCCESS) {
+        zend_throw_exception(NULL, object->ctx->errbuf, 0 TSRMLS_CC);
+
         RETURN_FALSE;
     }
 
-    RETURN_LONG(qid)
+    RETURN_TRUE;
 }
 /* }}} */
 
 
-/* {{{ proto boolean Groonga::recv()
+/* {{{ proto string Groonga::recv()
  */
 PHP_METHOD(Groonga, recv)
 {
     groonga_t *object;
-    zval *ret = NULL;
-
-    char *str = NULL;
-    int flags = 0;
-    unsigned int str_len, qid;
-
-    MAKE_STD_ZVAL(ret);
-
-    array_init(ret);
-    array_init(return_value);
+    char *res = NULL;
+    unsigned int length;
+    int flags;
 
     object = (groonga_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
 
     /* groongaからのメッセージ受信 */
-    qid = grn_ctx_recv(object->ctx, &str, &str_len, &flags);
+    object->qid = grn_ctx_recv(object->ctx, &res, &length, &flags);
     if (object->ctx->rc != GRN_SUCCESS) {
         RETURN_FALSE;
     }
+    object->flags = flags;
 
-    add_next_index_long(ret, flags);
-    add_next_index_stringl(ret, str, str_len, 1);
-
-    add_index_zval(return_value, qid, ret);
+    RETURN_STRINGL(res, length, 1);
 }
 /* }}} */
 
 
-/* {{{ proto long Groonga::query(string query[, long flags])
+/* {{{ proto long Groonga::getFlags()
+ */
+PHP_METHOD(Groonga, getFlags)
+{
+    groonga_t *object;
+
+    object = (groonga_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
+
+    RETURN_LONG(object->flags);
+}
+/* }}} */
+
+
+/* {{{ proto long Groonga::getQueryID()
+ */
+PHP_METHOD(Groonga, getQueryID)
+{
+    groonga_t *object;
+
+    object = (groonga_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
+
+    RETURN_LONG(object->qid);
+}
+/* }}} */
+
+
+/* {{{ proto long Groonga::getErrorMessage()
+ */
+PHP_METHOD(Groonga, getErrorMessage)
+{
+    groonga_t *object;
+    object = (groonga_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
+
+    RETURN_STRING(object->ctx->errbuf, 1);
+}
+/* }}} */
+
+
+/* {{{ proto string Groonga::query(string query[, long flags])
  */
 PHP_METHOD(Groonga, query)
 {
@@ -394,9 +454,9 @@ PHP_METHOD(Groonga, query)
 
     object = (groonga_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
 
-    grn_ctx_send(object->ctx, cmd, length, flags);
+    object->qid = grn_ctx_send(object->ctx, cmd, length, flags);
     if (GRN_SUCCESS == object->ctx->rc) {
-        grn_ctx_recv(object->ctx, &res, &length, &flags);
+        grn_ctx_recv(object->ctx, &res, &length, &object->flags);
     }
 
     if (GRN_SUCCESS != object->ctx->rc) {
