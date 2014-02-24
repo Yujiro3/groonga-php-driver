@@ -2,12 +2,12 @@
 // vim:ft=javascript
 
 // If your extension references something external, use ARG_WITH
-// ARG_WITH("groonga", "for groonga support", "no");
+// ARG_WITH("gqtpcli", "for gqtpcli support", "no");
 
 // Otherwise, use ARG_ENABLE
-// ARG_ENABLE("groonga", "enable groonga support", "no");
+// ARG_ENABLE("gqtpcli", "enable gqtpcli support", "no");
 
-if (PHP_GROONGA != "no") {
-	EXTENSION("groonga", "groonga.c");
+if (PHP_GQTPCLI != "no") {
+	EXTENSION("gqtpcli", "gqtpcli.c");
 }
 

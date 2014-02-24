@@ -19,16 +19,16 @@ Groonga Query Transfer Protocol support.
     $ sudo -s
     # make install
     # cd /etc/php5/mods-available
-    # echo extension=groonga.so > groonga.ini
+    # echo extension=groonga.so > gqtpcli.ini
     # cd /etc/php5/conf.d
-    # ln -s ../mods-available/groonga.ini ./20-groonga.ini
+    # ln -s ../mods-available/gqtpcli.ini ./20-gqtpcli.ini
     
 ### 接続 ###
 
 ```php
 <?php
 /* オブジェクト生成 */
-$grn = new Groonga();
+$grn = new GQTPcli();
 
 /* サーバ接続 */
 $grn->connect('localhost', 10043);

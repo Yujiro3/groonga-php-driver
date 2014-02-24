@@ -1,6 +1,6 @@
 <?php
 /* オブジェクト生成 */
-$grn = new Groonga();
+$grn = new GQTPcli();
 
 /* サーバ接続 */
 $grn->connect('localhost', 10043);
