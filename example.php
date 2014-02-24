@@ -14,7 +14,7 @@ if (!$result) {
 
 /* テーブルの表示 */
 $result = $grn->query('select --table Site');
-echo "テーブル作成後のテーブル内容\n"
+echo "テーブル作成後のテーブル内容\n";
 print_r(json_decode($result, true));
 echo "\n";
 
@@ -25,7 +25,7 @@ if (!$result) {
     $error = $grn->getErrorMessage();
     var_export($error);
 }
-echo "カラム作成後のテーブル内容\n"
+echo "カラム作成後のテーブル内容\n";
 $result = $grn->query('select --table Site');
 print_r(json_decode($result, true));
 echo "\n";
@@ -43,20 +43,20 @@ $grn->query('{"_key":"http://example.org/gat","title":"test test record eight."}
 $grn->query('{"_key":"http://example.com/vdw","title":"test test record nine."}');
 $grn->query("]");
 $result = $grn->query('select --table Site');
-echo "データ一覧\n"
+echo "データ一覧\n";
 print_r(json_decode($result, true));
 echo "\n";
 
 /* レコードの取得 */
 $result = $grn->query('select --table Site --query _id:1');
-echo "レコードの取得\n"
+echo "レコードの取得\n";
 print_r(json_decode($result, true));
 echo "\n";
 
 
 /* テーブルの一覧 */
 $result = $grn->query('table_list');
-echo "テーブルの一覧\n"
+echo "テーブルの一覧\n";
 print_r(json_decode($result, true));
 echo "\n";
 
